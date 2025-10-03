@@ -16,7 +16,7 @@
         }
         .chart-container {
             position: relative;
-            height: 40vh;
+            height: 70vh; /* Increased height to show all labels */
             width: 100%;
         }
         .kpi-card {
@@ -408,7 +408,10 @@
                      scales: {
                         y: {
                             beginAtZero: true,
-                            ticks: { color: '#d1d5db' }
+                            ticks: { 
+                                color: '#d1d5db',
+                                autoSkip: false
+                            }
                         },
                         x: {
                             ticks: { color: '#d1d5db' }
