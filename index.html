@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Utilitas Jalan - Provinsi NTT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            height: 40vh;
+            width: 100%;
+        }
+        .kpi-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        /* Custom scrollbar for table */
+        .table-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .table-container::-webkit-scrollbar-track {
+            background: #2d3748; /* bg-gray-700 */
+        }
+        .table-container::-webkit-scrollbar-thumb {
+            background-color: #4a5568; /* bg-gray-600 */
+            border-radius: 10px;
+            border: 2px solid #2d3748; /* bg-gray-700 */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div class="container mx-auto p-4 md:p-6 lg:p-8">
+
+        <!-- Header -->
+        <header class="mb-6 border-b border-gray-700 pb-4">
+            <h1 class="text-3xl font-bold text-white">Dashboard Analisis Utilitas Ruas Jalan</h1>
+            <p class="text-lg text-gray-400">Provinsi Nusa Tenggara Timur - Laporan TA. 2025</p>
+        </header>
+
+        <!-- Controls -->
+        <div class="mb-6 p-4 bg-gray-800 rounded-lg shadow-lg flex flex-col md:flex-row items-center gap-4">
+            <div class="w-full md:w-1/3">
+                <label for="kabupaten-filter" class="block text-sm font-medium text-gray-300 mb-1">Filter per Kabupaten/Kota</label>
+                <select id="kabupaten-filter" class="w-full bg-gray-700 border border-gray-600 text-white rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="semua">Tampilkan Semua</option>
+                    <!-- Options will be populated by JS -->
+                </select>
+            </div>
+            <div class="w-full md:w-2/3">
+                <label for="search-ruas" class="block text-sm font-medium text-gray-300 mb-1">Cari Nama Ruas Jalan</label>
+                 <input type="text" id="search-ruas" class="w-full bg-gray-700 border border-gray-600 text-white rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ketik untuk mencari ruas jalan...">
+            </div>
+        </div>
+
+        <!-- Key Performance Indicators (KPIs) -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+            <div class="kpi-card bg-gray-800 p-4 rounded-lg shadow-lg text-center">
+                <h3 class="text-sm font-medium text-gray-400">Total Panjang Ruas</h3>
+                <p id="kpi-panjang-ruas" class="text-2xl font-bold text-white mt-1">0 KM</p>
+            </div>
+            <div class="kpi-card bg-gray-800 p-4 rounded-lg shadow-lg text-center">
+                <h3 class="text-sm font-medium text-gray-400">Total Utilitas</h3>
+                <p id="kpi-total-utilitas" class="text-2xl font-bold text-cyan-400 mt-1">0</p>
+            </div>
+            <div class="kpi-card bg-gray-800 p-4 rounded-lg shadow-lg text-center">
+                <h3 class="text-sm font-medium text-gray-400">Tiang Listrik</h3>
+                <p id="kpi-tiang-listrik" class="text-2xl font-bold text-green-400 mt-1">0</p>
+            </div>
+            <div class="kpi-card bg-gray-800 p-4 rounded-lg shadow-lg text-center">
+                <h3 class="text-sm font-medium text-gray-400">Tiang Provider</h3>
+                <p id="kpi-tiang-provider" class="text-2xl font-bold text-yellow-400 mt-1">0</p>
+            </div>
+            <div class="kpi-card bg-gray-800 p-4 rounded-lg shadow-lg text-center">
+                <h3 class="text-sm font-medium text-gray-400">Papan Reklame</h3>
+                <p id="kpi-papan-reklame" class="text-2xl font-bold text-purple-400 mt-1">0</p>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div class="lg:col-span-2 bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h2 class="text-lg font-semibold mb-2 text-white">Sebaran Total Utilitas per Kabupaten/Kota</h2>
+                <div class="chart-container">
+                    <canvas id="barChart"></canvas>
+                </div>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h2 class="text-lg font-semibold mb-2 text-white">Komposisi Tipe Utilitas</h2>
+                <div class="chart-container">
+                    <canvas id="pieChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+            <h2 class="text-lg font-semibold mb-2 text-white">Rincian Data Ruas Jalan</h2>
+            <div class="table-container overflow-x-auto max-h-96">
+                <table class="w-full text-sm text-left text-gray-300">
+                    <thead class="text-xs text-gray-300 uppercase bg-gray-700 sticky top-0">
+                        <tr>
+                            <th scope="col" class="px-4 py-3">Nama Ruas</th>
+                            <th scope="col" class="px-4 py-3">Kabupaten/Kota</th>
+                            <th scope="col" class="px-4 py-3 text-right">Panjang (KM)</th>
+                            <th scope="col" class="px-4 py-3 text-right">Tiang Listrik</th>
+                            <th scope="col" class="px-4 py-3 text-right">Tiang Provider</th>
+                            <th scope="col" class="px-4 py-3 text-right">Papan Reklame</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detail-table-body">
+                        <!-- Data rows will be populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const csvData = `Kode Ruas,Nama Ruas,Panjang Ruas (KM),Tiang Listrik,Tiang Provider,Papan Reklame,Kabupaten/Kota,Kode Kab/Kota
+22.1,"Jl. Yos Sudarso",3.89,154,383,15,KOTA KUPANG,22
+22.2,"Sp. Tiga Terminal LLBK - Sp, Tiga Straat A",2.13,55,148,7,KOTA KUPANG,22
+22.3,"Sp. Patung Sonbai - Sp, Tiga Bundaran Oebufu",5.1,135,939,21,KOTA KUPANG,22
+22.4,"Jl. Frans Lebu Raya",2.55,55,324,50,KOTA KUPANG,22
+22.5,"Jl. Mesakh Amalo",0.84,24,181,1,KOTA KUPANG,22
+22.6,"Sp. Patung sonbai - Bello (Bts, Kota Kupang)",9.74,332,725,230,KOTA KUPANG,22
+22.7,"Jl. A. Nisnoni",6.62,136,656,10,KOTA KUPANG,22
+22.8,"Sp. Polda - Sp. Patung Merpati",8.06,324,1017,98,KOTA KUPANG,22
+22.9,"Jl. Amabi",2.27,80,251,13,KOTA KUPANG,22
+5.10,"Bello - Oesao (Bts, Kab, Kupang)",12.85,321,240,18,KABUPATEN KUPANG,5
+5.11,"Oesao - Takari",53.15,530,240,121,KABUPATEN KUPANG,5
+5.12,"Takari - Lelogama",49.2,642,398,0,KABUPATEN KUPANG,5
+5.13,"Oesao - Sulamu",35.65,491,372,21,KABUPATEN KUPANG,5
+5.14,"Sulamu - Pariti",18.7,298,421,5,KABUPATEN KUPANG,5
+5.15,"Oesao - Oekabiti (Bts, Kab, TTS)",12.39,119,548,62,KABUPATEN KUPANG,5
+5.16,"Sp, Oekabiti - Oepoli (Bts, Negara Timor Leste)",18.7,128,0,0,KABUPATEN KUPANG,5
+20.17,"Oekabiti (Bts, Kab, Kupang) - Soe",28.7,465,0,0,KABUPATEN TTS,20
+20.18,"Soe - Kapan",16.8,197,527,1,KABUPATEN TTS,20
+20.19,"Kapan - Nenas",25.75,194,286,0,KABUPATEN TTS,20
+20.20,"Nenas - Nuapain (Bts, Kab, Kupang)",20.3,0,0,0,KABUPATEN TTS,20
+20.21,"Kapan - Fatumnutu (Bts, Kab TTU)",23.43,598,209,0,KABUPATEN TTS,20
+20.22,"Sp, Niki-Niki - Oenlasi",19.45,77,134,1,KABUPATEN TTS,20
+20.23,"Oenlasi - Boking",30.92,508,0,0,KABUPATEN TTS,20
+20.24,"Boking - Webissik (Bts, Kab, Malaka)",23.6,0,0,0,KABUPATEN TTS,20
+20.25,"Soe - Kolbano",81.82,0,0,0,KABUPATEN TTS,20
+21.26,"Fatumnutu (Bts, Kab, TTS) - Kefamenanu",45.64,360,251,0,KABUPATEN TTU,21
+21.27,"Kefamenanu - Wini",52.1,303,169,3,KABUPATEN TTU,21
+21.28,"Sp, Wini - Motaain (Bts, Kab, Belu)",31.82,160,125,1,KABUPATEN TTU,21
+2.29,"Motaain (Bts, Kab, TTU) - Atapupu",4.7,112,0,0,KABUPATEN BELU,2
+2.30,"Atapupu - Sp, Tiga Motaain",2.1,102,0,0,KABUPATEN BELU,2
+2.31,"Atambua - Motaain (Bts, Negara Timor Leste)",22.61,421,139,1,KABUPATEN BELU,2
+2.32,"Sp, Tiga Atapupu - Atambua",22.7,210,141,0,KABUPATEN BELU,2
+2.33,"Sp, Weluli - Betun (Bts, Kab, Malaka)",28.37,129,0,0,KABUPATEN BELU,2
+7.34,"Betun (Bts, Kab, Belu) - Sp, Weluli",11.3,162,112,0,KABUPATEN MALAKA,7
+7.35,"Betun - Webissik (Bts, Kab, TTS)",36.8,421,211,0,KABUPATEN MALAKA,7
+7.36,"Webissik - batas Kab, TTS",2.1,0,0,0,KABUPATEN MALAKA,7
+7.37,"Betun - Motamasin (Bts, Negara Timor Leste)",32,298,173,0,KABUPATEN MALAKA,7
+7.38,"Sp, Haekesak - Turiskain",8.75,137,0,0,KABUPATEN MALAKA,7
+7.39,"Wekmidak - Oan Mane (Bts, Kab, TTU)",8.25,0,0,0,KABUPATEN MALAKA,7
+4.40,"Larantuka - Wureh",9.2,321,209,0,KABUPATEN FLORES TIMUR,4
+4.41,"Waiwerang - Sp, Tiga Bandara",4.8,111,89,1,KABUPATEN FLORES TIMUR,4
+4.42,"Waipare (Bts, Kab, Sikka) - Larantuka",51.2,529,349,0,KABUPATEN FLORES TIMUR,4
+4.43,"Sp, Tiga Waipare - Pelabuhan Waipare",0.5,2,0,0,KABUPATEN FLORES TIMUR,4
+4.44,"Sp, Tiga Simpang TPI - Pelabuhan Larantuka",1.5,12,0,0,KABUPATEN FLORES TIMUR,4
+4.45,"Terong - Lewolema",25.7,152,0,0,KABUPATEN FLORES TIMUR,4
+4.46,"Simpang Kalike - Waibalun",9.5,0,0,0,KABUPATEN FLORES TIMUR,4
+15.47,"Koro (Bts, Kab, Ende) - Maumere",36.58,400,0,0,KABUPATEN SIKKA,15
+15.48,"Hepang - Sikka",8.65,37,0,0,KABUPATEN SIKKA,15
+15.49,"Waipare - Bola",20,63,0,0,KABUPATEN SIKKA,15
+15.50,"Napungmali - Mudajebak (Bts, Kab, Flores Timur)",25.7,22,0,0,KABUPATEN SIKKA,15
+3.51,"Sp, Tiga Ndao - Nangapanda",20.8,321,288,0,KABUPATEN ENDE,3
+3.52,"Nangapanda - Ende",21.8,298,349,2,KABUPATEN ENDE,3
+3.53,"Ende - Detusoko",33.2,421,411,4,KABUPATEN ENDE,3
+3.54,"Detusoko - Koro (Bts, Kab, Sikka)",30.2,345,141,1,KABUPATEN ENDE,3
+3.55,"Maurole - Kotabaru",30.2,210,0,0,KABUPATEN ENDE,3
+3.56,"Sp, Watuneso - Wologai",14.73,111,0,3,KABUPATEN ENDE,3
+3.57,"Sp, Tiga Ndao - Aimere (Bts, Kab, Ngada)",12,0,0,0,KABUPATEN ENDE,3
+12.58,"Aimere (Bts, Kab, Ende) - Bajawa",30.9,421,211,0,KABUPATEN NGADA,12
+12.59,"Bajawa - Mataloko",11.5,162,112,0,KABUPATEN NGADA,12
+12.60,"Mataloko - Soa",12.8,210,141,0,KABUPATEN NGADA,12
+12.61,"Mataloko - Aegela (Bts, Kab, Nagekeo)",15.3,129,113,0,KABUPATEN NGADA,12
+12.62,"Bajawa - Bena",19.14,133,0,0,KABUPATEN NGADA,12
+12.63,"Riung - Peden",4.25,0,0,0,KABUPATEN NGADA,12
+11.64,"Aegela (Bts, Kab, Ngada) - Danga",10.2,162,0,0,KABUPATEN NAGEKEO,11
+11.65,"Danga - Maropokot",28.7,421,112,0,KABUPATEN NAGEKEO,11
+11.66,"Maropokot - Sp, Kilo Tiga",5.1,111,84,0,KABUPATEN NAGEKEO,11
+11.67,"Sp, Kilo Tiga - Gako (Bts, Kab, Mangarai Timur)",27.85,420,0,0,KABUPATEN NAGEKEO,11
+10.68,"Gako (Bts, Kab, Nagekeo) - Kisol",28.7,341,0,0,KABUPATEN MANGGARAI TIMUR,10
+10.69,"Kisol - Borong",12.1,162,0,0,KABUPATEN MANGGARAI TIMUR,10
+10.70,"Borong - Bealaing",31.2,321,112,0,KABUPATEN MANGGARAI TIMUR,10
+10.71,"Bealaing - Waerana (Bts, Kab, Manggarai)",21.8,421,73,0,KABUPATEN MANGGARAI TIMUR,10
+10.72,"Simpang Cumbi - Watunggong",20.11,243,0,0,KABUPATEN MANGGARAI TIMUR,10
+10.73,"Watunggong - Metin",6.5,0,0,0,KABUPATEN MANGGARAI TIMUR,10
+8.74,"Waerana (Bts, Kab, Manggarai Timur) - Ruteng",30.2,421,141,0,KABUPATEN MANGGARAI,8
+8.75,"Ruteng - Cancar",15.3,162,112,0,KABUPATEN MANGGARAI,8
+8.76,"Cancar - Pela (Bts, Kab, Manggarai Barat)",28.7,211,63,0,KABUPATEN MANGGARAI,8
+8.77,"Ruteng - Reo",20.63,122,0,0,KABUPATEN MANGGARAI,8
+9.78,"Pela (Bts, Kab, Manggarai) - Labuan Bajo",33.2,421,0,0,KABUPATEN MANGGARAI BARAT,9
+9.79,"Labuan Bajo - Sp, Tiga Bandara",2.8,111,0,2,KABUPATEN MANGGARAI BARAT,9
+9.80,"Sp, Tiga Bandara - Sp, Tiga Pede",3.1,129,0,1,KABUPATEN MANGGARAI BARAT,9
+9.81,"Sp, Tiga Pede - Pelabuhan",1.5,133,0,1,KABUPATEN MANGGARAI BARAT,9
+9.82,"Terang - Boleng",32.85,321,76,0,KABUPATEN MANGGARAI BARAT,9
+9.83,"Boleng - Bari",28.1,211,0,0,KABUPATEN MANGGARAI BARAT,9
+9.84,"Sp, Tiga Reo - Kedindi",9.4,118,0,0,KABUPATEN MANGGARAI BARAT,9
+19.85,"Melolo - Baing",65.2,529,112,0,KABUPATEN SUMBA TIMUR,19
+19.86,"Baing - Nggongi",38.7,421,81,1,KABUPATEN SUMBA TIMUR,19
+19.87,"Nggongi - Waingapu",40.8,459,0,0,KABUPATEN SUMBA TIMUR,19
+19.88,"Waingapu - Lewa",42.1,341,0,0,KABUPATEN SUMBA TIMUR,19
+19.89,"Lewa - Batas Kab, Sumba Tengah",25.65,321,0,0,KABUPATEN SUMBA TIMUR,19
+18.90,"Batas Kab, Sumba Timur - Anakalang",20.9,211,0,0,KABUPATEN SUMBA TENGAH,18
+18.91,"Anakalang - Waikabubak (Bts, Kab, Sumba Barat)",30.2,321,0,0,KABUPATEN SUMBA TENGAH,18
+18.92,"Anakalang - Pasar Waibakul",2.1,11,10,0,KABUPATEN SUMBA TENGAH,18
+18.93,"Mamboro - Lenang",26.8,160,0,0,KABUPATEN SUMBA TENGAH,18
+16.94,"Waikabubak (Bts, Kab, Sumba Tengah) - Batas Kota Waikabubak",2.1,112,0,0,KABUPATEN SUMBA BARAT,16
+16.95,"Batas Kota Waikabubak - Waikabubak",3.2,129,0,0,KABUPATEN SUMBA BARAT,16
+16.96,"Waikabubak - Waitabula (Bts, Kab, Sumba Barat Daya)",30.8,321,112,0,KABUPATEN SUMBA BARAT,16
+16.97,"Waikabubak - Mamboro (Bts, Kab, Sumba Tengah)",22.05,253,86,0,KABUPATEN SUMBA BARAT,16
+17.98,"Waitabula (Bts, Kab, Sumba Barat) - Waitabula",1.5,129,0,0,KABUPATEN SUMBA BARAT DAYA,17
+17.99,"Waitabula - Pelabuhan Waikelo",4.2,111,0,0,KABUPATEN SUMBA BARAT DAYA,17
+17.100,"Waitabula - Pero",35.8,421,0,0,KABUPATEN SUMBA BARAT DAYA,17
+17.101,"Waitabula - Weekeloh",25.7,211,118,0,KABUPATEN SUMBA BARAT DAYA,17
+17.102,"Weekeloh - Wainyapu",28.1,112,0,0,KABUPATEN SUMBA BARAT DAYA,17
+17.103,"Weekeloh - Pantai Londalima",12.8,123,0,0,KABUPATEN SUMBA BARAT DAYA,17
+17.104,"Wainyapu - Kodi",11.9,0,0,0,KABUPATEN SUMBA BARAT DAYA,17
+13.105,"Batas Kota Baa - Baa",1.5,129,0,0,KABUPATEN ROTE NDAO,13
+13.106,"Baa - Pelabuhan Baa",2.1,111,84,0,KABUPATEN ROTE NDAO,13
+13.107,"Baa - Busalangga",25.7,321,112,0,KABUPATEN ROTE NDAO,13
+13.108,"Busalangga - Batutua",30.8,421,113,0,KABUPATEN ROTE NDAO,13
+13.109,"Batutua - Pelabuhan Batutua",1.5,133,0,0,KABUPATEN ROTE NDAO,13
+13.110,"Baa - E'Elungu",28.1,341,0,0,KABUPATEN ROTE NDAO,13
+13.111,"E'Elungu - Landu",12.8,211,0,0,KABUPATEN ROTE NDAO,13
+13.112,"E'Elungu - Korbafo",12.6,289,0,0,KABUPATEN ROTE NDAO,13
+14.113,"Sebar - Pelabuhan Seba",1.5,133,0,0,KABUPATEN SABU RAIJUA,14
+14.114,"Sebar - Bolou",20.8,321,0,0,KABUPATEN SABU RAIJUA,14
+14.115,"Bolou - Eimadake",25.7,421,0,0,KABUPATEN SABU RAIJUA,14
+14.116,"Eimadake - Liae",28.1,253,179,0,KABUPATEN SABU RAIJUA,14
+14.117,"Liae - Eikare",16.65,218,0,0,KABUPATEN SABU RAIJUA,14
+6.118,"Lewoleba - Simpang Tiga Bandara",2.1,111,84,0,KABUPATEN LEMBATA,6
+6.119,"Simpang Tiga Bandara - Pelabuhan Lewoleba",1.5,129,0,0,KABUPATEN LEMBATA,6
+6.120,"Lewoleba - Balauring",30.8,421,112,0,KABUPATEN LEMBATA,6
+6.121,"Balauring - Wairiang",22.05,253,126,0,KABUPATEN LEMBATA,6
+6.122,"Wairiang - Loang",14.95,182,0,0,KABUPATEN LEMBATA,6
+1.123,"Kalabahi - Mola",5.1,129,0,0,KABUPATEN ALOR,1
+1.124,"Mola - Sp, Tiga Bandara",2.1,111,84,0,KABUPATEN ALOR,1
+1.125,"Sp, Tiga Bandara - Pelabuhan Kalabahi",1.5,133,0,0,KABUPATEN ALOR,1
+1.126,"Kalabahi - Kokar",30.8,421,112,0,KABUPATEN ALOR,1
+1.127,"Kokar - Ternate",22.05,253,126,0,KABUPATEN ALOR,1
+1.128,"Ternate - Apui",14.95,182,0,0,KABUPATEN ALOR,1
+1.129,"Apui - Alor Kecil",12.6,289,0,0,KABUPATEN ALOR,1
+1.130,"Alor Kecil - Lawahing",10.2,162,0,0,KABUPATEN ALOR,1
+1.131,"Lawahing - Bukapiting",28.7,421,112,0,KABUPATEN ALOR,1
+1.132,"Bukapiting - Maritaing",20.1,243,0,0,KABUPATEN ALOR,1
+1.133,"Maritaing - Kabir",9.9,118,469,0,KABUPATEN ALOR,1`;
+
+        let fullData = [];
+        let barChart, pieChart;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const parsedData = Papa.parse(csvData, {
+                header: true,
+                skipEmptyLines: true,
+                dynamicTyping: true
+            });
+
+            fullData = parsedData.data;
+
+            // Clean data
+            fullData.forEach(row => {
+                 row['Panjang Ruas (KM)'] = typeof row['Panjang Ruas (KM)'] === 'string' ? parseFloat(row['Panjang Ruas (KM)'].replace(',', '.')) : row['Panjang Ruas (KM)'];
+                 for (let key in row) {
+                    if (row[key] === null) row[key] = 0;
+                 }
+            });
+
+            populateKabupatenFilter();
+            initializeCharts();
+            updateDashboard();
+
+            document.getElementById('kabupaten-filter').addEventListener('change', updateDashboard);
+            document.getElementById('search-ruas').addEventListener('keyup', (e) => updateDashboard(e.target.value));
+        });
+
+        function populateKabupatenFilter() {
+            const filter = document.getElementById('kabupaten-filter');
+            const kabupatenSet = new Set(fullData.map(row => row['Kabupaten/Kota']));
+            const sortedKabupaten = [...kabupatenSet].sort();
+            sortedKabupaten.forEach(kab => {
+                const option = document.createElement('option');
+                option.value = kab;
+                option.textContent = kab;
+                filter.appendChild(option);
+            });
+        }
+        
+        function formatNumber(num) {
+            return new Intl.NumberFormat('id-ID').format(num);
+        }
+
+        function updateDashboard() {
+            const selectedKabupaten = document.getElementById('kabupaten-filter').value;
+            const searchTerm = document.getElementById('search-ruas').value.toLowerCase();
+
+            let filteredData = fullData;
+
+            if (selectedKabupaten !== 'semua') {
+                filteredData = filteredData.filter(row => row['Kabupaten/Kota'] === selectedKabupaten);
+            }
+
+            // KPIs
+            const totalPanjang = filteredData.reduce((sum, row) => sum + (row['Panjang Ruas (KM)'] || 0), 0);
+            const totalListrik = filteredData.reduce((sum, row) => sum + (row['Tiang Listrik'] || 0), 0);
+            const totalProvider = filteredData.reduce((sum, row) => sum + (row['Tiang Provider'] || 0), 0);
+            const totalReklame = filteredData.reduce((sum, row) => sum + (row['Papan Reklame'] || 0), 0);
+            const totalUtilitas = totalListrik + totalProvider + totalReklame;
+
+            document.getElementById('kpi-panjang-ruas').textContent = `${formatNumber(totalPanjang.toFixed(2))} KM`;
+            document.getElementById('kpi-total-utilitas').textContent = formatNumber(totalUtilitas);
+            document.getElementById('kpi-tiang-listrik').textContent = formatNumber(totalListrik);
+            document.getElementById('kpi-tiang-provider').textContent = formatNumber(totalProvider);
+            document.getElementById('kpi-papan-reklame').textContent = formatNumber(totalReklame);
+            
+            // Pie Chart update
+            pieChart.data.datasets[0].data = [totalListrik, totalProvider, totalReklame];
+            pieChart.update();
+
+            // Bar Chart update
+            const dataByKabupaten = {};
+            fullData.forEach(row => { // Always show all kabupaten in bar chart for comparison
+                const kab = row['Kabupaten/Kota'];
+                if (!dataByKabupaten[kab]) {
+                    dataByKabupaten[kab] = 0;
+                }
+                dataByKabupaten[kab] += (row['Tiang Listrik'] || 0) + (row['Tiang Provider'] || 0) + (row['Papan Reklame'] || 0);
+            });
+            
+            const sortedKabupatenData = Object.entries(dataByKabupaten).sort(([,a],[,b]) => b-a);
+            
+            barChart.data.labels = sortedKabupatenData.map(item => item[0].replace('KABUPATEN ', 'KAB. '));
+            barChart.data.datasets[0].data = sortedKabupatenData.map(item => item[1]);
+            barChart.update();
+
+
+            // Table Update
+            let tableFilteredData = filteredData;
+            if(searchTerm) {
+                tableFilteredData = filteredData.filter(row => row['Nama Ruas'].toLowerCase().includes(searchTerm));
+            }
+            populateTable(tableFilteredData);
+        }
+
+        function populateTable(data) {
+            const tableBody = document.getElementById('detail-table-body');
+            tableBody.innerHTML = ''; // Clear existing rows
+            if(data.length === 0) {
+                 tableBody.innerHTML = `<tr><td colspan="6" class="text-center p-4">Data tidak ditemukan.</td></tr>`;
+                 return;
+            }
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-gray-700 hover:bg-gray-600';
+                tr.innerHTML = `
+                    <td class="px-4 py-2 font-medium text-white">${row['Nama Ruas']}</td>
+                    <td class="px-4 py-2">${row['Kabupaten/Kota']}</td>
+                    <td class="px-4 py-2 text-right">${(row['Panjang Ruas (KM)'] || 0).toFixed(2)}</td>
+                    <td class="px-4 py-2 text-right text-green-400">${formatNumber(row['Tiang Listrik'] || 0)}</td>
+                    <td class="px-4 py-2 text-right text-yellow-400">${formatNumber(row['Tiang Provider'] || 0)}</td>
+                    <td class="px-4 py-2 text-right text-purple-400">${formatNumber(row['Papan Reklame'] || 0)}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        function initializeCharts() {
+            // Bar Chart
+            const barCtx = document.getElementById('barChart').getContext('2d');
+            barChart = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Total Utilitas',
+                        data: [],
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                     scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#d1d5db' }
+                        },
+                        x: {
+                            ticks: { color: '#d1d5db' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                           display: false
+                        }
+                    }
+                }
+            });
+
+            // Pie Chart
+            const pieCtx = document.getElementById('pieChart').getContext('2d');
+            pieChart = new Chart(pieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Tiang Listrik', 'Tiang Provider', 'Papan Reklame'],
+                    datasets: [{
+                        label: 'Komposisi Utilitas',
+                        data: [0, 0, 0],
+                        backgroundColor: [
+                            'rgba(16, 185, 129, 0.8)', // Green
+                            'rgba(245, 158, 11, 0.8)', // Yellow
+                            'rgba(168, 85, 247, 0.8)' // Purple
+                        ],
+                        borderColor: '#1f2937',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#d1d5db',
+                                boxWidth: 12,
+                                padding: 20,
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
